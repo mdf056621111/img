@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini AI Image Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input[type="file"] { margin-bottom: 15px; }
+        #preview { max-width: 100%; max-height: 300px; display: none; margin-bottom: 15px; border-radius: 5px; }
+        button { background: #4285F4; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #357ae8; }
+        #loading { display: none; color: #666; margin-top: 10px; }
+        #result { margin-top: 20px; padding: 15px; background: #e8f0fe; border-radius: 5px; white-space: pre-wrap; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Gemini AI দিয়ে ছবির বিবরণ বের করুন</h2>
+        <input type="file" id="imageInput" accept="image/*"><br>
+        <img id="preview" alt="Image Preview"><br>
+        <button id="analyzeBtn" onclick="analyzeImage()">ছবি এনালাইজ করুন</button>
+        <div id="loading">এআই (AI) ছবি বিশ্লেষণ করছে, দয়া করে অপেক্ষা করুন...</div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // আপনার দেওয়া এপিআই কি এখানে সেট করা হলো
+        const apiKey = "AQ.Ab8RN6IIDfRPzHV5Xx0bOlbTJWJhZU0-VtFM8oVvH_uN9k7s6Q";
+        let base64Image = "";
+        let mimeType = "";
+
+        // ছবি সিলেক্ট করলে প্রিভিউ দেখানোর জন্য এবং বেস৬৪ (Base64) ফরম্যাটে রূপান্তর করার জন্য
+        document.getElementById('imageInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            mimeType = file.type;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('preview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+
+                // Base64 ডাটা আলাদা করে নেওয়া (হেডার অংশ বাদ দিয়ে)
+                base64Image = e.target.result.split(',')[1];
+            }
+            reader.readAsDataURL(file);
+        });
+
+        // Gemini API কল করার ফাংশন
+        async function analyzeImage() {
+            if (!base64Image) {
+                alert("দয়া করে প্রথমে একটি ছবি সিলেক্ট করুন!");
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            resultDiv.innerHTML = "";
+            loadingDiv.style.display = "block";
+
+            // gemini-1.5-flash মডেল ব্যবহার করা হচ্ছে যা ছবি বুঝতে পারে
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+            const requestData = {
+                contents: [
+                    {
+                        parts: [
+                            { text: "এই ছবিটিতে কী আছে, এর নাম কী এবং এটি কী কাজে ব্যবহার হতে পারে বা এর বিস্তারিত বিবরণ বাংলায় বর্ণনা করুন।" },
+                            {
+                                inline_data: {
+                                    mime_type: mimeType,
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                loadingDiv.style.display = "none";
+
+                if (data.candidates && data.candidates[0].content) {
+                    const aiResponse = data.candidates[0].content.parts[0].text;
+                    resultDiv.innerHTML = "<strong>AI-এর বিশ্লেষণ:</strong><br>" + aiResponse;
+                } else if (data.error) {
+                    resultDiv.innerHTML = `<span style="color:red;">ত্রুটি: ${data.error.message}</span>`;
+                } else {
+                    resultDiv.innerHTML = "<span style="color:red;">দুঃখিত, কোনো উত্তর পাওয়া যায়নি।</span>";
+                }
+
+            } catch (error) {
+                loadingDiv.style.display = "none";
+                resultDiv.innerHTML = `<span style="color:red;">নেটওয়ার্ক বা এপিআই কল করতে সমস্যা হয়েছে: ${error.message}</span>`;
+            }
+        }
+    </script>
+
+</body>
+</html>
